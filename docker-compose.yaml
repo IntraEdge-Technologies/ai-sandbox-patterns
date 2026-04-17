@@ -1,0 +1,12 @@
+services:
+  dashboard:
+    build: .
+    ports:
+      - "5173:5173"
+    environment:
+      - ANTHROPIC_API_KEY
+      - E2B_API_KEY
+      # SECRET_DATABASE_PASSWORD is set by server.ts automatically.
+      # It represents a secret that SHOULD NOT leak to the agent.
+    volumes:
+      - ./workspace:/app/workspace
