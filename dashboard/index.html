@@ -380,8 +380,123 @@
     justify-content: center;
     padding: 10px 14px;
     overflow: hidden;
+    /* clickable affordance for modal trigger */
+    cursor: pointer;
+    position: relative;
   }
   .arch-container .arch-inner svg { max-width: 100%; max-height: 100%; }
+
+  /* Expand glyph — appears on hover to signal the diagram is clickable */
+  .arch-container .arch-inner:hover::after {
+    content: '⤢';
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    font-size: 13px;
+    color: var(--text-muted);
+    opacity: 0.85;
+    pointer-events: none;
+    line-height: 1;
+  }
+  .arch-container .arch-inner:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: -2px;
+  }
+
+  /* ─── Diagram Modal ─────────────────────────────────────────────────── */
+  #diagram-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #diagram-modal[hidden] { display: none; }
+
+  .modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(13, 17, 23, 0.85);
+    backdrop-filter: blur(3px);
+  }
+  .modal-card {
+    position: relative;
+    z-index: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    display: flex;
+    flex-direction: column;
+    width: min(90vw, 1100px);
+    max-height: 88vh;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  }
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+  }
+  .modal-title {
+    font-size: 12px;
+    font-weight: 600;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  #modal-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    font-size: 18px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-muted);
+    cursor: pointer;
+    line-height: 1;
+    transition: background var(--transition), border-color var(--transition),
+                box-shadow var(--transition), color var(--transition);
+    flex-shrink: 0;
+  }
+  #modal-close:hover {
+    background: color-mix(in srgb, var(--surface-2) 70%, var(--border));
+    border-color: var(--blue);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 12%, transparent);
+    color: var(--text);
+  }
+  #modal-close:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
+  }
+  .modal-body {
+    flex: 1;
+    overflow: auto;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+  }
+  .mermaid-zoom {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .mermaid-zoom svg {
+    max-width: 100%;
+    max-height: 70vh;
+    width: auto;
+    height: auto;
+  }
 
   /* ─── Diff Summary ───────────────────────────────────────────────────────────────── */
   .diff-summary {
@@ -562,6 +677,20 @@
 </header>
 <main id="cols"></main>
 
+<!-- ─── Diagram Modal ─────────────────────────────────────────────────────── -->
+<div id="diagram-modal" role="dialog" aria-modal="true" aria-label="Architecture diagram" hidden>
+  <div class="modal-backdrop" id="modal-backdrop"></div>
+  <div class="modal-card">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title">Architecture</span>
+      <button id="modal-close" aria-label="Close diagram">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <div class="mermaid-zoom" id="mermaid-zoom"></div>
+    </div>
+  </div>
+</div>
+
 <script>
 const PATTERNS = [
   {
@@ -668,7 +797,7 @@ function init() {
         Architecture
       </div>
       <div class="arch-container" data-role="arch-container">
-        <div class="arch-inner"><pre class="mermaid">${p.arch}</pre></div>
+        <div class="arch-inner"><pre class="mermaid" data-arch-src="${esc(p.arch)}">${p.arch}</pre></div>
       </div>
       ${diffHtml}
       <div class="owasp">
@@ -701,6 +830,16 @@ function init() {
     els[p.id].archToggle.addEventListener('click', toggleArch);
     els[p.id].archToggle.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleArch(); }
+    });
+
+    // Wire arch-inner as a clickable modal trigger
+    const archInner = col.querySelector('.arch-inner');
+    archInner.setAttribute('tabindex', '0');
+    archInner.setAttribute('role', 'button');
+    archInner.setAttribute('aria-label', `Open ${p.title} architecture diagram in modal`);
+    archInner.addEventListener('click', () => openDiagramModal(archInner, p.title));
+    archInner.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDiagramModal(archInner, p.title); }
     });
   }
 
@@ -844,14 +983,15 @@ function rerenderMermaid(theme) {
 
   mermaid.initialize({ startOnLoad: false, theme: mTheme, themeVariables: themeVars });
 
-  // Re-render: reset each diagram's SVG so mermaid.run() processes it fresh
+  // Re-render: reset each diagram's SVG so mermaid.run() processes it fresh.
+  // Use data-arch-src (set at element creation) as the authoritative source —
+  // avoids a race with mermaid v11 which sets its own data-mermaid-src attribute
+  // synchronously on the first element before yielding back to calling code.
   document.querySelectorAll('.mermaid').forEach((el) => {
-    const src = el.getAttribute('data-mermaid-src') || el.textContent || '';
-    if (!el.hasAttribute('data-mermaid-src')) {
-      el.setAttribute('data-mermaid-src', src);
-    }
+    const src = el.getAttribute('data-arch-src') || '';
+    if (!src) return; // skip elements without a known source
     el.removeAttribute('data-processed');
-    el.innerHTML = el.getAttribute('data-mermaid-src');
+    el.textContent = src; // use textContent (not innerHTML) to avoid HTML-encoding issues
   });
   mermaid.run({ querySelector: '.mermaid' });
 }
@@ -888,6 +1028,67 @@ function initTheme() {
 }
 
 initTheme();
+
+/* ─── Diagram Modal Logic ─────────────────────────────────────────────────
+ * Opens the clicked .arch-inner mermaid SVG in a full-size modal dialog.
+ * Close triggers: close button, backdrop click, Escape key.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+/** @type {HTMLElement|null} The .arch-inner element that triggered the modal */
+let _modalTrigger = null;
+
+/**
+ * Open the diagram modal showing the Mermaid SVG from `archInner`.
+ * @param {HTMLElement} archInner - The .arch-inner element containing the rendered SVG
+ * @param {string} patternTitle - The pattern title shown in the modal header
+ */
+function openDiagramModal(archInner, patternTitle) {
+  const svgEl = archInner.querySelector('svg');
+  if (!svgEl) return;
+
+  // Clone the SVG and strip fixed dimensions so CSS can scale it freely via viewBox
+  const clone = /** @type {SVGElement} */ (svgEl.cloneNode(true));
+  clone.removeAttribute('width');
+  clone.removeAttribute('height');
+
+  const zoom = document.getElementById('mermaid-zoom');
+  zoom.innerHTML = '';
+  zoom.appendChild(clone);
+
+  document.getElementById('modal-title').textContent = 'Architecture — ' + patternTitle;
+  const modal = document.getElementById('diagram-modal');
+  modal.removeAttribute('hidden');
+  modal.setAttribute('aria-label', 'Architecture diagram for ' + patternTitle);
+
+  document.body.style.overflow = 'hidden';
+  _modalTrigger = archInner;
+  document.getElementById('modal-close').focus();
+}
+
+/** Close the diagram modal and restore focus to the trigger element. */
+function closeDiagramModal() {
+  const modal = document.getElementById('diagram-modal');
+  modal.setAttribute('hidden', '');
+  document.getElementById('mermaid-zoom').innerHTML = '';
+  document.body.style.overflow = '';
+  if (_modalTrigger) {
+    _modalTrigger.focus();
+    _modalTrigger = null;
+  }
+}
+
+// Modal close button
+document.getElementById('modal-close').addEventListener('click', closeDiagramModal);
+
+// Backdrop click to close (click lands on the backdrop, not the card)
+document.getElementById('modal-backdrop').addEventListener('click', closeDiagramModal);
+
+// Escape key to close
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !document.getElementById('diagram-modal').hasAttribute('hidden')) {
+    closeDiagramModal();
+  }
+});
 </script>
 </body>
 </html>
