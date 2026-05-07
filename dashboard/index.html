@@ -1,8 +1,19 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="system">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- Inline theme init: read localStorage before first paint to prevent flash of wrong theme -->
+<script>
+  (function () {
+    var saved = localStorage.getItem('theme');
+    var valid = ['system', 'light', 'dark'];
+    document.documentElement.setAttribute(
+      'data-theme',
+      valid.includes(saved) ? saved : 'system'
+    );
+  })();
+</script>
 <title>Sandboxing Patterns for AI Runtimes</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -10,7 +21,7 @@
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <script>mermaid.initialize({ startOnLoad: false, theme: 'dark', themeVariables: { primaryColor: '#1e2530', primaryTextColor: '#c8cdd5', primaryBorderColor: '#2e3640', lineColor: '#4a5568', fontSize: '11px', fontFamily: 'JetBrains Mono, SF Mono, Menlo, monospace' } });</script>
 <style>
-  /* ─── Design Tokens ─────────────────────────────────────────────────── */
+  /* ─── Design Tokens ────────────────────────────────────────────────── */
   :root {
     --bg:            #0d1117;
     --surface:       #161b22;
@@ -41,7 +52,45 @@
     --header-h:      56px;
   }
 
-  /* ─── Reset ─────────────────────────────────────────────────────────── */
+  /* ─── Explicit Dark Override ────────────────────────────────────────────────── */
+  :root[data-theme="dark"] {
+    --bg:            #0d1117;
+    --surface:       #161b22;
+    --surface-2:     #21262d;
+    --border:        #30363d;
+    --border-subtle: #21262d;
+    --text:          #e6edf3;
+    --text-muted:    #8b949e;
+    --text-dim:      #484f58;
+  }
+
+  /* ─── Light Theme ────────────────────────────────────────────────────────── */
+  :root[data-theme="light"] {
+    --bg:            #ffffff;
+    --surface:       #f6f8fa;
+    --surface-2:     #eaeef2;
+    --border:        #d0d7de;
+    --border-subtle: #eaeef2;
+    --text:          #1f2328;
+    --text-muted:    #636c76;
+    --text-dim:      #8c959f;
+  }
+
+  /* ─── System: apply light tokens when OS is light + theme=system ───────────────── */
+  @media (prefers-color-scheme: light) {
+    :root[data-theme="system"] {
+      --bg:            #ffffff;
+      --surface:       #f6f8fa;
+      --surface-2:     #eaeef2;
+      --border:        #d0d7de;
+      --border-subtle: #eaeef2;
+      --text:          #1f2328;
+      --text-muted:    #636c76;
+      --text-dim:      #8c959f;
+    }
+  }
+
+  /* ─── Reset ───────────────────────────────────────────────────────────────────── */
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
     height: 100%;
@@ -53,13 +102,13 @@
     -webkit-font-smoothing: antialiased;
   }
 
-  /* ─── Scrollbars ─────────────────────────────────────────────────────── */
+  /* ─── Scrollbars ─────────────────────────────────────────────────────────────── */
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: var(--radius-pill); }
   ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
 
-  /* ─── Header ─────────────────────────────────────────────────────────── */
+  /* ─── Header ───────────────────────────────────────────────────────────────────── */
   header {
     position: sticky;
     top: 0;
@@ -129,7 +178,7 @@
     50% { opacity: 0.4; }
   }
 
-  /* ─── Buttons ────────────────────────────────────────────────────────── */
+  /* ─── Buttons ────────────────────────────────────────────────────────────────── */
   .btn {
     display: inline-flex;
     align-items: center;
@@ -178,7 +227,16 @@
 
   .header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
-  /* ─── Layout ─────────────────────────────────────────────────────────── */
+  /* ─── Theme Toggle ───────────────────────────────────────────────────────────────── */
+  #theme-toggle {
+    min-width: 82px;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.02em;
+  }
+
+  /* ─── Layout ───────────────────────────────────────────────────────────────────── */
   main {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -188,7 +246,7 @@
     overflow: hidden;
   }
 
-  /* ─── Pattern Column Card ────────────────────────────────────────────── */
+  /* ─── Pattern Column Card ──────────────────────────────────────────────────────── */
   .col {
     background: var(--surface);
     display: flex;
@@ -202,7 +260,7 @@
   .col[data-pattern="b"] { border-top-color: var(--accent-b); }
   .col[data-pattern="c"] { border-top-color: var(--accent-c); }
 
-  /* ─── Column Header ──────────────────────────────────────────────────── */
+  /* ─── Column Header ─────────────────────────────────────────────────────────────── */
   .col-head {
     padding: 14px 16px 12px;
     border-bottom: 1px solid var(--border-subtle);
@@ -248,7 +306,7 @@
     padding-top: 2px;
   }
 
-  /* ─── Status Badge ───────────────────────────────────────────────────── */
+  /* ─── Status Badge ────────────────────────────────────────────────────────────────── */
   .badge {
     font-family: var(--font-mono);
     font-size: 10px;
@@ -281,7 +339,7 @@
   }
   @keyframes badge-pulse { 50% { opacity: 0.45; } }
 
-  /* ─── Architecture Toggle ────────────────────────────────────────────── */
+  /* ─── Architecture Toggle ────────────────────────────────────────────────────────────── */
   .arch-toggle {
     display: flex;
     align-items: center;
@@ -325,7 +383,7 @@
   }
   .arch-container .arch-inner svg { max-width: 100%; max-height: 100%; }
 
-  /* ─── Diff Summary ───────────────────────────────────────────────────── */
+  /* ─── Diff Summary ───────────────────────────────────────────────────────────────── */
   .diff-summary {
     display: flex;
     flex-wrap: wrap;
@@ -352,7 +410,7 @@
     border: 1px solid color-mix(in srgb, var(--red) 20%, var(--border));
   }
 
-  /* ─── OWASP Row ──────────────────────────────────────────────────────── */
+  /* ─── OWASP Row ──────────────────────────────────────────────────────────────────── */
   .owasp {
     display: flex;
     flex-wrap: wrap;
@@ -403,7 +461,7 @@
     border-color: var(--border-subtle);
   }
 
-  /* ─── Events Log ─────────────────────────────────────────────────────── */
+  /* ─── Events Log ──────────────────────────────────────────────────────────────────── */
   .events {
     flex: 1;
     overflow-y: auto;
@@ -456,7 +514,7 @@
     border-left: 3px solid var(--green);
   }
 
-  /* ─── Report Panel ───────────────────────────────────────────────────── */
+  /* ─── Report Panel ──────────────────────────────────────────────────────────────────── */
   .report {
     flex-shrink: 0;
     border-top: 1px dashed var(--border-subtle);
@@ -497,6 +555,7 @@
   </div>
   <div class="secret-banner">Canary: <code>SECRET_DATABASE_PASSWORD=prod-db-hunter2</code></div>
   <div class="header-actions">
+    <button id="theme-toggle" class="btn" aria-label="Current theme: System. Click to switch to Light.">System ⊙</button>
     <button id="run-all" class="btn btn-primary">Run All Three</button>
     <button id="clear" class="btn">Clear</button>
   </div>
@@ -512,7 +571,7 @@ const PATTERNS = [
     file: 'agent-a.ts',
     diff: null,
     arch: 'graph LR\n  F["Fastify"] --> A["agent-a.ts"] --> T["Bash/Read/Write"]\n  S["SECRET_DB_PASS"] -.-> A\n  subgraph Docker["Docker Container"]\n    F\n    S\n    A\n    T\n  end',
-    useCase: 'Raw query() with Bash/Read/Write. No sandbox, no custom MCP. The agent sees everything in env \u2014 including SECRET_DATABASE_PASSWORD.',
+    useCase: 'Raw query() with Bash/Read/Write. No sandbox, no custom MCP. The agent sees everything in env — including SECRET_DATABASE_PASSWORD.',
     owasp: [
       { id: 'LLM01', name: 'Prompt Injection', rating: 'fail' },
       { id: 'LLM02', name: 'Sensitive Info Disclosure', rating: 'fail' },
@@ -554,7 +613,7 @@ const PATTERNS = [
     file: 'agent-c.ts',
     diff: { added: ['+sbx exec', '+SECRET blocked', '+own kernel'], removed: [] },
     arch: 'graph LR\n  F["Fastify"] --"sbx exec"--> A["agent-c.ts"] --> T["Bash/Read/Write"]\n  S["SECRET_DB_PASS"] --x A\n  subgraph Docker["Docker Container"]\n    F\n    S\n  end\n  subgraph SBX["sbx Firecracker VM"]\n    A\n    T\n  end',
-    useCase: 'Identical code to agent-a.ts. Security is WHERE it runs \u2014 sbx exec launches it in a Firecracker microVM. SECRET never enters VM.',
+    useCase: 'Identical code to agent-a.ts. Security is WHERE it runs — sbx exec launches it in a Firecracker microVM. SECRET never enters VM.',
     owasp: [
       { id: 'LLM01', name: 'Prompt Injection', rating: 'partial' },
       { id: 'LLM02', name: 'Sensitive Info Disclosure', rating: 'pass' },
@@ -588,7 +647,7 @@ function init() {
         }</div>`
       : '';
 
-    const owaspIcons = { fail: '\u2717', partial: '\u25b3', pass: '\u2713', na: '\u2014' };
+    const owaspIcons = { fail: '✗', partial: '△', pass: '✓', na: '—' };
 
     col.innerHTML = `
       <div class="col-head">
@@ -619,7 +678,7 @@ function init() {
       <div class="events" data-role="events"><div class="empty">${esc(p.useCase)}</div></div>
       <div class="report" data-role="report">
         <h3>report-${esc(p.id)}.md</h3>
-        <pre data-role="report-body">\u2014 waiting for run \u2014</pre>
+        <pre data-role="report-body">— waiting for run —</pre>
       </div>
     `;
 
@@ -654,7 +713,7 @@ function init() {
       const e = els[id];
       e.events.innerHTML = `<div class="empty">${esc(e.useCase)}</div>`;
       e.eventCount = 0;
-      e.reportBody.textContent = '\u2014 waiting for run \u2014';
+      e.reportBody.textContent = '— waiting for run —';
       e.report.className = 'report';
       setBadge(id, 'idle');
     }
@@ -725,7 +784,7 @@ function updateOwaspBadges(patternId, results) {
   if (!col) return;
   const owaspDiv = col.querySelector('.owasp');
   if (!owaspDiv) return;
-  const icons = { fail: '\u2717', partial: '\u25b3', pass: '\u2713', na: '\u2014' };
+  const icons = { fail: '✗', partial: '△', pass: '✓', na: '—' };
   for (const r of results) {
     const tag = owaspDiv.querySelector(`.otag[data-id="${r.id}"]`);
     if (tag) {
@@ -743,6 +802,92 @@ function esc(s) {
 
 init();
 mermaid.run({ querySelector: '.mermaid' });
+
+/* ─── Theme Toggle Logic ─────────────────────────────────────────────────────────────────────
+ * Three states: system → light → dark → system (cycles on each click).
+ * Persisted in localStorage under key "theme".
+ * Mermaid is re-initialised on every theme change to match the new palette.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/** @type {Record<string, {label: string, next: string, ariaNext: string}>} */
+const THEME_META = {
+  system: { label: 'System ⊙', next: 'light', ariaNext: 'Current theme: System. Click to switch to Light.' },
+  light:  { label: 'Light ☀',  next: 'dark',  ariaNext: 'Current theme: Light. Click to switch to Dark.'  },
+  dark:   { label: 'Dark ☾',   next: 'system', ariaNext: 'Current theme: Dark. Click to switch to System.' },
+};
+
+/**
+ * Resolve the effective Mermaid theme for a given data-theme value.
+ * "system" defers to the OS; if the OS is dark (or we can't tell), use 'dark'.
+ * @param {string} theme - One of 'system' | 'light' | 'dark'
+ * @returns {'dark' | 'default'}
+ */
+function resolveMermaidTheme(theme) {
+  if (theme === 'light') return 'default';
+  if (theme === 'dark')  return 'dark';
+  // system — check OS preference
+  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'default' : 'dark';
+}
+
+/**
+ * Re-initialise Mermaid with the correct palette and re-render all diagrams.
+ * @param {string} theme - One of 'system' | 'light' | 'dark'
+ */
+function rerenderMermaid(theme) {
+  const mTheme = resolveMermaidTheme(theme);
+  const themeVars =
+    mTheme === 'dark'
+      ? { primaryColor: '#1e2530', primaryTextColor: '#c8cdd5', primaryBorderColor: '#2e3640',
+          lineColor: '#4a5568', fontSize: '11px', fontFamily: 'JetBrains Mono, SF Mono, Menlo, monospace' }
+      : { primaryColor: '#dbeafe', primaryTextColor: '#1f2328', primaryBorderColor: '#d0d7de',
+          lineColor: '#636c76', fontSize: '11px', fontFamily: 'JetBrains Mono, SF Mono, Menlo, monospace' };
+
+  mermaid.initialize({ startOnLoad: false, theme: mTheme, themeVariables: themeVars });
+
+  // Re-render: reset each diagram's SVG so mermaid.run() processes it fresh
+  document.querySelectorAll('.mermaid').forEach((el) => {
+    const src = el.getAttribute('data-mermaid-src') || el.textContent || '';
+    if (!el.hasAttribute('data-mermaid-src')) {
+      el.setAttribute('data-mermaid-src', src);
+    }
+    el.removeAttribute('data-processed');
+    el.innerHTML = el.getAttribute('data-mermaid-src');
+  });
+  mermaid.run({ querySelector: '.mermaid' });
+}
+
+/**
+ * Apply a theme: set data-theme attribute, update button, persist to localStorage.
+ * @param {string} theme - One of 'system' | 'light' | 'dark'
+ */
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('theme', theme);
+  const meta = THEME_META[theme] || THEME_META['system'];
+  const btn = document.getElementById('theme-toggle');
+  if (btn) {
+    btn.textContent = meta.label;
+    btn.setAttribute('aria-label', meta.ariaNext);
+  }
+  rerenderMermaid(theme);
+}
+
+/** Initialise the theme toggle — called once after DOM is ready. */
+function initTheme() {
+  const saved = localStorage.getItem('theme');
+  const initial = ['system', 'light', 'dark'].includes(saved) ? saved : 'system';
+  applyTheme(initial);
+
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    const current = document.documentElement.getAttribute('data-theme') || 'system';
+    const next = (THEME_META[current] || THEME_META['system']).next;
+    applyTheme(next);
+  });
+}
+
+initTheme();
 </script>
 </body>
 </html>
